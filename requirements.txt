@@ -13,3 +13,11 @@ docstring-parser
 httpx
 scikit-learn
 pydantic
+requests
+flask
+pandas
+whisper
+markdown
+duckdb
+bs4
+Pillow

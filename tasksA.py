@@ -203,42 +203,106 @@ def A8(filename='/data/credit_card.txt', image_path='/data/credit_card.png'):
 
 
 
-def get_embedding(text):
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {AIPROXY_TOKEN}"
-    }
-    data = {
-        "model": "text-embedding-3-small",
-        "input": [text]
-    }
-    response = requests.post("http://aiproxy.sanand.workers.dev/openai/v1/embeddings", headers=headers, data=json.dumps(data))
-    response.raise_for_status()
-    return response.json()["data"][0]["embedding"]
+# def get_embedding(text):
+#     headers = {
+#         "Content-Type": "application/json",
+#         "Authorization": f"Bearer {AIPROXY_TOKEN}"
+#     }
+#     data = {
+#         "model": "text-embedding-3-small",
+#         "input": [text]
+#     }
+#     response = requests.post("http://aiproxy.sanand.workers.dev/openai/v1/embeddings", headers=headers, data=json.dumps(data))
+#     response.raise_for_status()
+#     return response.json()["data"][0]["embedding"]
 
-def A9(filename='/data/comments.txt', output_filename='/data/comments-similar.txt'):
+# def A9(filename='/data/comments.txt', output_filename='/data/comments-similar.txt'):
+#     # Read comments
+#     with open(filename, 'r') as f:
+#         comments = [line.strip() for line in f.readlines()]
+
+#     # Get embeddings for all comments
+#     embeddings = [get_embedding(comment) for comment in comments]
+
+#     # Find the most similar pair
+#     min_distance = float('inf')
+#     most_similar = (None, None)
+
+#     for i in range(len(comments)):
+#         for j in range(i + 1, len(comments)):
+#             distance = cosine(embeddings[i], embeddings[j])
+#             if distance < min_distance:
+#                 min_distance = distance
+#                 most_similar = (comments[i], comments[j])
+
+#     # Write the most similar pair to file
+#     with open(output_filename, 'w') as f:
+#         f.write(most_similar[0] + '\n')
+#         f.write(most_similar[1] + '\n')
+
+
+import openai
+from scipy.spatial.distance import cosine
+
+# ✅ Use the correct model
+EMBEDDING_MODEL = "text-embedding-3-small"  # or "text-embedding-3-large"
+
+def get_embedding(comment):
+    try:
+        response = openai.Embedding.create(
+            input=comment,
+            model=EMBEDDING_MODEL
+        )
+        if "data" in response:
+            return response["data"][0]["embedding"]
+        else:
+            print(f"❌ ERROR: Unexpected API response - {response}")
+            return None
+    except openai.error.AuthenticationError:
+        print("❌ ERROR: Authentication failed! Check your API key.")
+        return None
+    except Exception as e:
+        print(f"❌ ERROR: {e}")
+        return None
+
+def A9(filename='comments.txt', output_filename='comments-similar.txt'):
     # Read comments
     with open(filename, 'r') as f:
         comments = [line.strip() for line in f.readlines()]
 
-    # Get embeddings for all comments
-    embeddings = [get_embedding(comment) for comment in comments]
+    # Get embeddings (skip failed ones while keeping valid comments)
+    valid_comments = []
+    embeddings = []
+
+    for comment in comments:
+        emb = get_embedding(comment)
+        if emb is not None:
+            valid_comments.append(comment)
+            embeddings.append(emb)
+
+    if len(embeddings) < 2:
+        print("❌ Not enough valid embeddings to compare.")
+        return
 
     # Find the most similar pair
     min_distance = float('inf')
     most_similar = (None, None)
 
-    for i in range(len(comments)):
-        for j in range(i + 1, len(comments)):
+    for i in range(len(valid_comments)):
+        for j in range(i + 1, len(valid_comments)):
             distance = cosine(embeddings[i], embeddings[j])
             if distance < min_distance:
                 min_distance = distance
-                most_similar = (comments[i], comments[j])
+                most_similar = (valid_comments[i], valid_comments[j])
 
     # Write the most similar pair to file
     with open(output_filename, 'w') as f:
         f.write(most_similar[0] + '\n')
         f.write(most_similar[1] + '\n')
+
+    print(f"✅ Most similar comments written to {output_filename}")
+
+
 
 def A10(filename='/data/ticket-sales.db', output_filename='/data/ticket-sales-gold.txt', query="SELECT SUM(units * price) FROM tickets WHERE type = 'Gold'"):
     # Connect to the SQLite database
